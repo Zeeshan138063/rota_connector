@@ -60,6 +60,15 @@ class RotaService:
         self.connector = RotaConnector(**kwargs)
         self.connector.set_credentials(client_id, client_secret)
 
+    def check_health(self) -> Any:
+        """
+        Check the connectivity and status of the ROTA Core Service.
+        
+        Returns:
+            JSON object `{ "status": "ok", "service": "rota-backend" }`
+        """
+        return self.connector.health()
+
     # ── Grid & Availability ───────────────────────────────────────────────────
 
     def get_practice_grid(self, payload: PracticeGridRequestSchema) -> Any:

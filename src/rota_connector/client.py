@@ -105,6 +105,12 @@ class RotaConnector:
         """Remove the current credentials."""
         self._base_client.clear_credentials()
 
+    def health(self) -> "Any":
+        """
+        Check the health and connectivity of the upstream ROTA Core Service.
+        """
+        return self._base_client.get("/health")
+
     # ── Provider wiring ───────────────────────────────────────────────────────
 
     def set_resource_provider(self, provider: IResourceProvider) -> None:

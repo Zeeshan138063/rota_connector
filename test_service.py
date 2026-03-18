@@ -13,6 +13,14 @@ def run_test():
         base_url="http://localhost:8000"
     )
 
+    # Let's check the health of the engine first
+    print("\nChecking ROTA Backend Health...")
+    try:
+        health_status = service.check_health()
+        print("✅ Core is online:", health_status)
+    except Exception as e:
+        print("❌ Core offline or unavailable:", e)
+
     # 2. Let's test calling an admin endpoint to register a new project 
     # (Because it doesn't require prior authentication credentials!)
     rnd_name = f"TestApp-{str(uuid4())[:8]}"
