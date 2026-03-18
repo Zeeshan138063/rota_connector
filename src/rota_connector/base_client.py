@@ -156,32 +156,35 @@ class BaseClient:
     def post(
         self,
         endpoint: str,
+        params:   dict[str, Any] | None    = None,
         json:     dict[str, Any] | None    = None,
         data:     dict[str, Any] | None    = None,
         headers:  dict[str, str] | None    = None,
     ) -> Any:
         url = self._build_url(endpoint)
-        resp = self.client.post(url, json=json, data=data, headers=self._get_headers(headers))
+        resp = self.client.post(url, params=params, json=json, data=data, headers=self._get_headers(headers))
         return self._handle_response(resp)
 
     def put(
         self,
         endpoint: str,
+        params:   dict[str, Any] | None    = None,
         json:     dict[str, Any] | None    = None,
         headers:  dict[str, str] | None    = None,
     ) -> Any:
         url = self._build_url(endpoint)
-        resp = self.client.put(url, json=json, headers=self._get_headers(headers))
+        resp = self.client.put(url, params=params, json=json, headers=self._get_headers(headers))
         return self._handle_response(resp)
 
     def patch(
         self,
         endpoint: str,
+        params:   dict[str, Any] | None    = None,
         json:     dict[str, Any] | None    = None,
         headers:  dict[str, str] | None    = None,
     ) -> Any:
         url = self._build_url(endpoint)
-        resp = self.client.patch(url, json=json, headers=self._get_headers(headers))
+        resp = self.client.patch(url, params=params, json=json, headers=self._get_headers(headers))
         return self._handle_response(resp)
 
     def delete(
