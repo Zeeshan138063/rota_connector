@@ -85,7 +85,7 @@ class PracticeGridRequestSchema(BaseModel):
         None,
         description="null | 'unallocated' | 'partially_allocated' | 'fully_allocated'",
     )
-    practice_contexts: dict[str, PracticeContext]
+    practice_contexts: dict[UUID, PracticeContext]
 
 
 class AvailableStaffRequestSchema(BaseModel):
