@@ -22,7 +22,7 @@ class RotaAPI:
         self.version = version
 
     def _base(self) -> str:
-        return f"/api/{self.version}/rota"
+        return "/rota"
 
     def practice_grid(self, payload: PracticeGridRequestSchema) -> Any:
         """Get Practice Grid."""

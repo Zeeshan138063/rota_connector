@@ -13,7 +13,7 @@ class ProjectsAPI:
         self.version = version
 
     def _base(self) -> str:
-        return f"/api/{self.version}/projects"
+        return "/projects"
 
     def register_project(self, payload: ProjectCreateSchema) -> Any:
         """Register a new project in the system."""
