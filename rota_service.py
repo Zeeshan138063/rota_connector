@@ -14,12 +14,15 @@ Usage:
     rota_service = RotaService(
         client_id="YOUR_PROJECT_CLIENT_ID",
         client_secret="YOUR_PROJECT_CLIENT_SECRET",
-        base_url="https://rota-backend.31g.co.uk" # Or your private instance URL
+        base_url="https://rota-backend.31g.co.uk", # Or your private instance URL
+        staff_provider=MyDjangoStaffProvider(),
+        practice_provider=MyDjangoPracticeProvider()
     )
 
     # 2. Call any available SDK method!
-    available_staff = rota_service.get_available_staff(
-        practice_id=..., target_date=..., role_id=..., payload=...
+    # With providers, payloads auto-hydrate!
+    available_staff = rota_service.auto_get_available_staff(
+        practice_id=..., target_date=..., role_id=...
     )
 """
 
@@ -28,6 +31,9 @@ from typing import Any, Optional
 from uuid import UUID
 
 from rota_connector import RotaConnector
+from rota_connector.interfaces.context_provider import IContextProvider
+from rota_connector.interfaces.resource_provider import IResourceProvider
+from rota_connector.schemas.common import DateRangeFilter
 from rota_connector.schemas.project import ProjectCreateSchema
 from rota_connector.schemas.rota import (
     AvailableStaffRequestSchema,
@@ -37,21 +43,24 @@ from rota_connector.schemas.rota import (
     EditFollowingSchema,
     EditOccurrenceSchema,
     PracticeGridRequestSchema,
+    StaffContextEnriched,
+    PracticeContext
 )
 
 
 class RotaService:
     """Wrapper service class around the RotaConnector SDK."""
     
-    def __init__(self, client_id: str, client_secret: str, base_url: Optional[str] = None):
+    def __init__(
+        self, 
+        client_id: str, 
+        client_secret: str, 
+        base_url: Optional[str] = None,
+        staff_provider: Optional[IResourceProvider] = None,
+        practice_provider: Optional[IContextProvider] = None
+    ):
         """
-        Initialize the connector and set global project credentials.
-        These credentials will be automatically injected into every request header.
-        
-        Args:
-            client_id (str): The unique Project Client ID from ROTA Core.
-            client_secret (str): The Project Client Secret.
-            base_url (str, optional): Overrides the default ROTA API url (e.g. for localhost testing).
+        Initialize the connector and optionally wire in your ORM Providers.
         """
         kwargs = {}
         if base_url:
@@ -59,66 +68,52 @@ class RotaService:
             
         self.connector = RotaConnector(**kwargs)
         self.connector.set_credentials(client_id, client_secret)
+        self.staff_provider = staff_provider
+        self.practice_provider = practice_provider
 
     def check_health(self) -> Any:
-        """
-        Check the connectivity and status of the ROTA Core Service.
-        
-        Returns:
-            JSON object `{ "status": "ok", "service": "rota-backend" }`
-        """
         return self.connector.health()
+
+
+    # ── Providers Helper ──────────────────────────────────────────────────────
+
+    def get_assignment_contexts(self, staff_id: UUID, practice_id: UUID, target_date: Optional[date] = None) -> dict:
+        """
+        Queries the DB Providers for live capacity, slots, and required 
+        hours to automatically hydrate assignment payloads without frontend intervention.
+        """
+        if not self.staff_provider or not self.practice_provider:
+             raise ValueError("Both staff_provider and practice_provider must be initialized to auto-hydrate contexts.")
+             
+        # Ask Provider for Practice rules (e.g. 40 hours standard)
+        practice_context = self.practice_provider.get_practice_context(practice_id)
+        
+        # Ask Provider for Staff capacity
+        date_range = DateRangeFilter(start_date=target_date, end_date=target_date) if target_date else None
+        staff_context = self.staff_provider.get_staff_context(staff_id, date_range=date_range)
+        
+        return {
+            "staff_context": staff_context,
+            "practice_context": practice_context
+        }
+
 
     # ── Grid & Availability ───────────────────────────────────────────────────
 
     def get_practice_grid(self, payload: PracticeGridRequestSchema) -> Any:
         """
-        Fetch the practice schedule grid to view open requirements and allocations.
-        
-        The ROTA Engine operates neutrally via contexts. This allows you to evaluate your
-        internal Staff/Practice setup dynamically without the engine permanently storing it.
-
-        Args:
-            payload (PracticeGridRequestSchema):
-                - week_start (date): The starting date for the 7-day grid view.
-                - role_id (UUID): Filter applicable role ID (e.g. 'nurse', 'doctor').
-                - practice_ids (List[UUID]): Filter grid to specific practices.
-                - status_filter (str): 'unallocated', 'partially_allocated', or 'fully_allocated'.
-                - practice_contexts (dict): Supply the required hours logic dynamically for each
-                  queried practice, e.g., `{"practice_uuid": PracticeContext(required_hours=40)}`.
-                  
-        Returns:
-            List of `PracticeGridOut` objects detailing allocated vs required hours per day.
+        Fetch the weekly practice-view grid schedule from the engine.
+        Returns a timeline grouped by practice_id and date.
         """
         return self.connector.rota.practice_grid(payload)
 
-    def get_staff_grid(
-        self, 
-        week_start: date, 
-        role_id: UUID, 
-        staff_ids: Optional[str] = None, 
-        practice_id: Optional[UUID] = None
-    ) -> Any:
+    def get_staff_grid(self, week_start: date, role_id: UUID, staff_ids: Optional[str] = None, practice_id: Optional[UUID] = None) -> Any:
         """
-        Fetch the staff schedule grid to view individual working shifts.
-        
-        This will return the precise occurrence-level allocations for each staff member, 
-        including any specific start/end times per day in the target week.
-
-        Args:
-            week_start (date): The starting date for the 7-day view.
-            role_id (UUID): The role being queried.
-            staff_ids (str, optional): A comma-separated list of UUID strings to filter down.
-            practice_id (UUID, optional): Filter occurrences specifically mapping to a practice.
-            
-        Returns:
-            List of `StaffGridOut` containing daily occurrence timelines.
+        Fetch the weekly staff-view grid schedule from the engine.
+        Returns a timeline grouped by staff_id and date.
         """
         return self.connector.rota.staff_grid(
-            week_start=week_start, 
-            role_id=role_id, 
-            staff_ids=staff_ids, 
-            practice_id=practice_id
+            week_start=week_start, role_id=role_id, staff_ids=staff_ids, practice_id=practice_id
         )
 
     def get_available_staff(
@@ -129,9 +124,9 @@ class RotaService:
         payload: AvailableStaffRequestSchema
     ) -> Any:
         """
-        Query the ROTA engine for real-time staff availability over a target date.
+        *(Native)* Query the ROTA engine natively for real-time staff availability over a target date.
         
-        The ROTA backend acts as a calculation engine. You pass in all potential staff and 
+        The ROTA backend acts as a calculation engine. You manually push in all staff and 
         their individual working rules/hours, and the engine cross-references them against 
         existing allocations, returning exactly who can take the shift and how much capacity 
         they have left.
@@ -142,11 +137,6 @@ class RotaService:
             role_id (UUID): Role requirement.
             payload (AvailableStaffRequestSchema):
                 Requires `staff_contexts` = List of `StaffContextEnriched`.
-                Each staff context must define:
-                - staff_id (UUID)
-                - start_date / end_date (contract boundaries)
-                - weekly_capacity (Decimal of maximum hours they can theoretically work)
-                - day_slots (List of generic Shift availabilities: day(0=Mon-6=Sun), start, end, is_active).
 
         Returns:
             AvailabilityResponseSchemaBase: A mix of `available_staff` (those who can take the shift,
@@ -158,6 +148,24 @@ class RotaService:
             role_id=role_id, 
             payload=payload
         )
+
+    def auto_get_available_staff(self, practice_id: UUID, target_date: date, role_id: UUID) -> Any:
+        """
+        *(Smart Helper)* Dynamically hydrates the entire AvailableStaffRequestSchema payload 
+        by querying the injected `staff_provider` for all staff capacity contexts 
+        assigned to the practice.
+        
+        This means no manual payload formatting is required to resolve availability!
+        """
+        if not self.staff_provider:
+             raise ValueError("staff_provider is required for auto-hydration.")
+             
+        # Ask DB for all staff working contexts at this practice
+        staff_list = self.staff_provider.list_staff_contexts(practice_id=practice_id)
+        
+        payload = AvailableStaffRequestSchema(staff_contexts=staff_list)
+        return self.get_available_staff(practice_id, target_date, role_id, payload)
+
 
     # ── Assignments Management ────────────────────────────────────────────────
 
@@ -178,7 +186,7 @@ class RotaService:
 
     def create_assignment(self, payload: CreateAssignmentSchema) -> Any:
         """
-        Create a new ONE-OFF or RECURRING assignment. 
+        *(Native)* Create a new ONE-OFF or RECURRING assignment natively. 
         Engine natively resolves recurring shifts into expanded daily Occurrences.
 
         Args:
@@ -198,6 +206,27 @@ class RotaService:
             The generated `AssignmentOut` object representing the master configuration.
         """
         return self.connector.rota.create_assignment(payload)
+
+
+    def safe_create_assignment(self, payload: CreateAssignmentSchema) -> Any:
+        """
+        *(Smart Helper)* Safely validate your custom business logic before pushing the 
+        assignment to the remote engine.
+        
+        Utilizes `practice_provider.validate_entity_in_context` to guarantee the 
+        target staff member is legally allowed to work at the target practice based 
+        on your internal database rules.
+        """
+        if self.practice_provider:
+            is_member = self.practice_provider.validate_entity_in_context(
+                staff_id=payload.staff_id, 
+                practice_id=payload.practice_id
+            )
+            if not is_member:
+                raise ValueError("Validation Failed: Staff member is not assigned to this context!")
+                
+        return self.connector.rota.create_assignment(payload)
+
 
     def edit_occurrence(self, assignment_id: UUID, payload: EditOccurrenceSchema) -> Any:
         """
@@ -224,7 +253,7 @@ class RotaService:
             payload (EditFollowingSchema):
                 - from_date: The date from which the new rule overrides begin.
                 - start_time / end_time: The new standard times.
-                - staff_context, practice_context.
+                - staff_context, practice_context: Live quota contexts.
         """
         return self.connector.rota.edit_following(assignment_id, payload)
 
@@ -237,7 +266,7 @@ class RotaService:
             assignment_id (UUID): The assignment core to mutate.
             payload (EditAllSchema):
                 - start_time / end_time: Baseline adjustments for the entire duration.
-                - staff_context, practice_context.
+                - staff_context, practice_context: Live quota contexts.
                 - Optional RRULE adjustments (`date`, `recurrence_start/end`, `recurrence_rule`).
         """
         return self.connector.rota.edit_all(assignment_id, payload)
@@ -262,6 +291,7 @@ class RotaService:
             assignment_id (UUID): Targets the core `AssignmentOut` ID.
         """
         return self.connector.rota.delete_assignment(assignment_id)
+
 
     # ── Projects Management (Admin Only) ──────────────────────────────────────
 
