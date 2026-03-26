@@ -12,4 +12,4 @@ pydantic-core==2.41.5
 rota-connector @ git+ssh://git@bitbucket.org/31green/rota_connector.git@673f8126112cd8e8149b53aeca5cb33f14ffb3c6
 typing-extensions==4.15.0
 typing-inspection==0.4.2
-python-dotenv
+python-dotenv==1.0.1
