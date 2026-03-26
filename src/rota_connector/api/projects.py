@@ -13,11 +13,11 @@ class ProjectsAPI:
         self.version = version
 
     def _base(self) -> str:
-        return "/projects"
+        return "/api/v1/projects"
 
     def register_project(self, payload: ProjectCreateSchema) -> Any:
         """Register a new project in the system."""
-        response = self.client.post(f"{self._base()}/register/", json=payload.model_dump(mode="json"))
+        response = self.client.post(f"{self._base()}/register", json=payload.model_dump(mode="json"))
         return response.get("data") if response and "data" in response else response
 
     def rotate_secret(self, project_id: UUID) -> Any:

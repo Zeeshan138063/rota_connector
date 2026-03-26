@@ -9,7 +9,7 @@ def test_register_project(connector, httpx_mock):
 
     httpx_mock.add_response(
         method="POST",
-        url=f"{connector._base_client.base_url}/api/v1/projects/register/",
+        url=f"{connector._base_client.base_url}/api/v1/projects/register",
         json={"data": {"project_id": str(uuid.uuid4()), "slug": "test-project"}}
     )
 

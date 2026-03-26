@@ -109,7 +109,7 @@ class RotaConnector:
         """
         Check the health and connectivity of the upstream ROTA Core Service.
         """
-        return self._base_client.get("/health")
+        return self._base_client.get("/api/v1/health")
 
     # ── Provider wiring ───────────────────────────────────────────────────────
 

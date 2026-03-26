@@ -23,7 +23,7 @@ def test_practice_grid(connector, httpx_mock):
 
     httpx_mock.add_response(
         method="POST",
-        url=f"{connector._base_client.base_url}/api/v1/rota/grid/practice/",
+        url=f"{connector._base_client.base_url}/api/v1/rota/grid/practice",
         json={"data": [{"practice_id": str(uuid.uuid4())}]}
     )
 
@@ -37,7 +37,7 @@ def test_staff_grid(connector, httpx_mock):
     
     httpx_mock.add_response(
         method="GET",
-        url=f"{connector._base_client.base_url}/api/v1/rota/grid/staff/?week_start=2026-04-01&role_id={role_id}",
+        url=f"{connector._base_client.base_url}/api/v1/rota/grid/staff?week_start=2026-04-01&role_id={role_id}",
         json={"data": [{"staff_id": str(uuid.uuid4())}]}
     )
 
@@ -63,7 +63,7 @@ def test_create_assignment(connector, httpx_mock):
 
     httpx_mock.add_response(
         method="POST",
-        url=f"{connector._base_client.base_url}/api/v1/rota/assignments/",
+        url=f"{connector._base_client.base_url}/api/v1/rota/assignments",
         json={"data": {"id": str(uuid.uuid4()), "staff_id": str(payload.staff_id)}}
     )
 
@@ -76,7 +76,7 @@ def test_cancel_occurrence(connector, httpx_mock):
 
     httpx_mock.add_response(
         method="POST",
-        url=f"{connector._base_client.base_url}/api/v1/rota/assignments/{assignment_id}/cancel-occurrence/",
+        url=f"{connector._base_client.base_url}/api/v1/rota/assignments/{assignment_id}/cancel-occurrence",
         json={"data": {"assignment_id": str(assignment_id), "is_exception": True}}
     )
 

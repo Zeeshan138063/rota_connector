@@ -14,7 +14,7 @@ Usage:
     rota_service = RotaService(
         client_id="YOUR_PROJECT_CLIENT_ID",
         client_secret="YOUR_PROJECT_CLIENT_SECRET",
-        base_url="https://rota-backend.31g.co.uk", # Or your private instance URL
+        base_url="https://rota-backend.31g.co.uk", # Base URL (SDK adds /api/v1 prefix)
         staff_provider=MyDjangoStaffProvider(),
         practice_provider=MyDjangoPracticeProvider()
     )
