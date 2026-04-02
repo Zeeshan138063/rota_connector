@@ -82,3 +82,78 @@ def test_cancel_occurrence(connector, httpx_mock):
 
     result = connector.rota.cancel_occurrence(assignment_id, payload)
     assert result["is_exception"] is True
+
+
+def test_get_assignment(connector, httpx_mock):
+    """get_assignment fetches a single active assignment by ID."""
+    assignment_id = uuid.uuid4()
+    staff_id = uuid.uuid4()
+
+    httpx_mock.add_response(
+        method="GET",
+        url=f"{connector._base_client.base_url}/api/v1/rota/assignments/{assignment_id}",
+        json={
+            "data": {
+                "id": str(assignment_id),
+                "staff_id": str(staff_id),
+                "deleted_at": None,
+                "deleted_by_id": None,
+            }
+        },
+    )
+
+    result = connector.rota.get_assignment(assignment_id)
+    assert result["id"] == str(assignment_id)
+    assert result["deleted_at"] is None
+
+
+def test_delete_assignment_with_deleted_by_id(connector, httpx_mock):
+    """delete_assignment passes deleted_by_id as a query param and returns full assignment data."""
+    assignment_id = uuid.uuid4()
+    deleted_by_id = uuid.uuid4()
+    staff_id = uuid.uuid4()
+
+    httpx_mock.add_response(
+        method="DELETE",
+        url=(
+            f"{connector._base_client.base_url}/api/v1/rota/assignments/{assignment_id}"
+            f"?deleted_by_id={deleted_by_id}"
+        ),
+        json={
+            "data": {
+                "id": str(assignment_id),
+                "staff_id": str(staff_id),
+                "hours": "4.00",
+                "deleted_at": "2026-04-02T12:00:00Z",
+                "deleted_by_id": str(deleted_by_id),
+            },
+            "message": "Assignment deleted successfully",
+        },
+    )
+
+    result = connector.rota.delete_assignment(assignment_id, deleted_by_id=deleted_by_id)
+    assert result["id"] == str(assignment_id)
+    assert result["deleted_by_id"] == str(deleted_by_id)
+    assert result["deleted_at"] is not None
+
+
+def test_delete_assignment_without_deleted_by_id(connector, httpx_mock):
+    """delete_assignment works without deleted_by_id — no query param sent."""
+    assignment_id = uuid.uuid4()
+
+    httpx_mock.add_response(
+        method="DELETE",
+        url=f"{connector._base_client.base_url}/api/v1/rota/assignments/{assignment_id}",
+        json={
+            "data": {
+                "id": str(assignment_id),
+                "deleted_at": "2026-04-02T12:00:00Z",
+                "deleted_by_id": None,
+            },
+            "message": "Assignment deleted successfully",
+        },
+    )
+
+    result = connector.rota.delete_assignment(assignment_id)
+    assert result["id"] == str(assignment_id)
+    assert result["deleted_by_id"] is None
