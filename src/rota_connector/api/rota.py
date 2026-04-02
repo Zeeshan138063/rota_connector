@@ -108,7 +108,31 @@ class RotaAPI:
         )
         return response.get("data") if response and "data" in response else response
 
-    def delete_assignment(self, assignment_id: UUID) -> Any:
-        """Delete Assignment."""
-        response = self.client.delete(f"{self._base()}/assignments/{assignment_id}")
-        return response.get("message") if response and "message" in response else response
+    def get_assignment(self, assignment_id: UUID) -> Any:
+        """Retrieve a single active assignment by ID."""
+        response = self.client.get(f"{self._base()}/assignments/{assignment_id}")
+        return response.get("data") if response and "data" in response else response
+
+    def delete_assignment(
+        self,
+        assignment_id: UUID,
+        deleted_by_id: Optional[UUID] = None,
+    ) -> Any:
+        """Soft-delete an assignment.
+
+        Returns the full assignment data (hours, recurrence dates, etc.) so the
+        caller can reverse allocation deltas without maintaining a local mirror.
+
+        Args:
+            assignment_id: The assignment to delete.
+            deleted_by_id: Optional ID of the user performing the deletion.
+        """
+        params: dict[str, Any] = {}
+        if deleted_by_id:
+            params["deleted_by_id"] = str(deleted_by_id)
+
+        response = self.client.delete(
+            f"{self._base()}/assignments/{assignment_id}",
+            params=params if params else None,
+        )
+        return response.get("data") if response and "data" in response else response
