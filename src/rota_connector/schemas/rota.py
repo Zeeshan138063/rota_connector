@@ -184,6 +184,8 @@ class AssignmentOut(BaseModel):
     recurrence_end: Optional[datetime.date] = None
     recurrence_rule: Optional[str] = None
     created_at: datetime.datetime
+    deleted_at: Optional[datetime.datetime] = None
+    deleted_by_id: Optional[UUID] = None
 
 
 class OccurrenceOut(BaseModel):
