@@ -29,6 +29,7 @@ class StaffContextEnriched(StaffContext):
 
 class PracticeContext(BaseModel):
     required_hours: Decimal
+    frequency: str = "weekly"  # "weekly" | "daily"
 
 
 def _compute_hours(start_time: datetime.time, end_time: datetime.time) -> Decimal:
