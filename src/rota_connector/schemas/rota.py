@@ -32,10 +32,20 @@ class PracticeContext(BaseModel):
     frequency: str = "weekly"  # "weekly" | "daily"
 
 
-def _compute_hours(start_time: datetime.time, end_time: datetime.time) -> Decimal:
-    start_dt = datetime.datetime.combine(datetime.date.today(), start_time)
-    end_dt = datetime.datetime.combine(datetime.date.today(), end_time)
+def _compute_hours(
+    start_time: datetime.time,
+    end_time: datetime.time,
+    break_start: Optional[datetime.time] = None,
+    break_end: Optional[datetime.time] = None,
+) -> Decimal:
+    """Calculate net working hours, subtracting any break window."""
+    today = datetime.date.today()
+    start_dt = datetime.datetime.combine(today, start_time)
+    end_dt = datetime.datetime.combine(today, end_time)
     delta = end_dt - start_dt
+    if break_start and break_end:
+        break_delta = datetime.datetime.combine(today, break_end) - datetime.datetime.combine(today, break_start)
+        delta -= break_delta
     return Decimal(str(round(delta.total_seconds() / 3600, 2)))
 
 
@@ -50,6 +60,10 @@ class CreateAssignmentSchema(BaseModel):
     staff_context: StaffContext
     practice_context: PracticeContext
 
+    # Break window (optional)
+    break_start: Optional[datetime.time] = None
+    break_end: Optional[datetime.time] = None
+
     date: Optional[datetime.date] = None
     recurrence_start: Optional[datetime.date] = None
     recurrence_end: Optional[datetime.date] = None
@@ -58,12 +72,19 @@ class CreateAssignmentSchema(BaseModel):
     @computed_field
     @property
     def hours(self) -> Decimal:
-        return _compute_hours(self.start_time, self.end_time)
+        return _compute_hours(self.start_time, self.end_time, self.break_start, self.break_end)
 
     @model_validator(mode="after")
     def validate_by_type(self):
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be after start_time.")
+        if (self.break_start is None) != (self.break_end is None):
+            raise ValueError("break_start and break_end must both be provided together.")
+        if self.break_start and self.break_end:
+            if self.break_end <= self.break_start:
+                raise ValueError("break_end must be after break_start.")
+            if self.break_start <= self.start_time or self.break_end >= self.end_time:
+                raise ValueError("Break window must be within the shift.")
         if self.assignment_type == AssignmentType.ONCE:
             if not self.date:
                 raise ValueError("date is required for ONCE assignment.")
@@ -97,18 +118,27 @@ class EditOccurrenceSchema(BaseModel):
     original_date: datetime.date
     start_time: datetime.time
     end_time: datetime.time
+    break_start: Optional[datetime.time] = None
+    break_end: Optional[datetime.time] = None
     staff_context: StaffContext
     practice_context: PracticeContext
 
     @computed_field
     @property
     def hours(self) -> Decimal:
-        return _compute_hours(self.start_time, self.end_time)
+        return _compute_hours(self.start_time, self.end_time, self.break_start, self.break_end)
 
     @model_validator(mode="after")
     def validate_times(self):
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be after start_time.")
+        if (self.break_start is None) != (self.break_end is None):
+            raise ValueError("break_start and break_end must both be provided together.")
+        if self.break_start and self.break_end:
+            if self.break_end <= self.break_start:
+                raise ValueError("break_end must be after break_start.")
+            if self.break_start <= self.start_time or self.break_end >= self.end_time:
+                raise ValueError("Break window must be within the shift.")
         return self
 
 
@@ -116,24 +146,35 @@ class EditFollowingSchema(BaseModel):
     from_date: datetime.date
     start_time: datetime.time
     end_time: datetime.time
+    break_start: Optional[datetime.time] = None
+    break_end: Optional[datetime.time] = None
     staff_context: StaffContext
     practice_context: PracticeContext
 
     @computed_field
     @property
     def hours(self) -> Decimal:
-        return _compute_hours(self.start_time, self.end_time)
+        return _compute_hours(self.start_time, self.end_time, self.break_start, self.break_end)
 
     @model_validator(mode="after")
     def validate_times(self):
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be after start_time.")
+        if (self.break_start is None) != (self.break_end is None):
+            raise ValueError("break_start and break_end must both be provided together.")
+        if self.break_start and self.break_end:
+            if self.break_end <= self.break_start:
+                raise ValueError("break_end must be after break_start.")
+            if self.break_start <= self.start_time or self.break_end >= self.end_time:
+                raise ValueError("Break window must be within the shift.")
         return self
 
 
 class EditAllSchema(BaseModel):
     start_time: datetime.time
     end_time: datetime.time
+    break_start: Optional[datetime.time] = None
+    break_end: Optional[datetime.time] = None
     staff_context: StaffContext
     practice_context: PracticeContext
 
@@ -146,12 +187,19 @@ class EditAllSchema(BaseModel):
     @computed_field
     @property
     def hours(self) -> Decimal:
-        return _compute_hours(self.start_time, self.end_time)
+        return _compute_hours(self.start_time, self.end_time, self.break_start, self.break_end)
 
     @model_validator(mode="after")
     def validate_all(self):
         if self.end_time <= self.start_time:
             raise ValueError("end_time must be after start_time.")
+        if (self.break_start is None) != (self.break_end is None):
+            raise ValueError("break_start and break_end must both be provided together.")
+        if self.break_start and self.break_end:
+            if self.break_end <= self.break_start:
+                raise ValueError("break_end must be after break_start.")
+            if self.break_start <= self.start_time or self.break_end >= self.end_time:
+                raise ValueError("Break window must be within the shift.")
 
         if self.assignment_type == AssignmentType.ONCE:
             if not self.date:
