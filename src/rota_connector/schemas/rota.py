@@ -57,6 +57,7 @@ class CreateAssignmentSchema(BaseModel):
     start_time: datetime.time
     end_time: datetime.time
     created_by_id: Optional[UUID] = None
+    exclude_assignment_id: Optional[UUID] = None
     staff_context: StaffContext
     practice_context: PracticeContext
 
